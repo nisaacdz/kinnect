@@ -1,0 +1,46 @@
+CREATE TABLE Users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL, -- For securely storing passwords
+    name VARCHAR(100) NOT NULL,
+    profile_photo_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE FamilyTrees (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    creator_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+    visibility_level_id INT NOT NULL REFERENCES VisibilityLevels(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE Nodes (
+    id SERIAL PRIMARY KEY,
+    family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    photo_url TEXT,
+    description TEXT,
+    alias VARCHAR(100),
+    is_user BOOLEAN DEFAULT FALSE, -- True if linked to a user account
+    user_id INT UNIQUE REFERENCES Users(id) ON DELETE SET NULL, -- Linked user account, if any
+    parent_node_id INT REFERENCES Nodes(id) ON DELETE SET NULL, -- For hierarchical relationships
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE TreeMemberships (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+    family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
+    role VARCHAR(50) DEFAULT 'member', -- "admin", "member", etc.
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE JoinRequests (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+    family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
+    node_id INT NOT NULL REFERENCES Nodes(id), -- Position where user wants to join
+    status VARCHAR(50) DEFAULT 'pending', -- "pending", "approved", "rejected"
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
