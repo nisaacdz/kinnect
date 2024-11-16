@@ -1,12 +1,36 @@
 CREATE TABLE Users (
     id SERIAL PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL, -- For securely storing passwords
-    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255),
+    name VARCHAR(100),
     profile_photo_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+/* May merge the Users and the UserAuthProviders into a single table */
+
+CREATE TABLE UserAuthProviders (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL, -- E.g., "google", "facebook", "apple"
+    provider_user_id VARCHAR(255) NOT NULL, -- The unique ID provided by the third-party auth
+    access_token TEXT, -- Optional, for API access (encrypted if stored)
+    refresh_token TEXT, -- Optional, for long-lived sessions (encrypted if stored)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (provider, provider_user_id) -- Prevent duplicate entries for the same provider
+);
+
+CREATE TABLE ForkedFamilyTrees (
+    id SERIAL PRIMARY KEY,
+    original_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
+    forked_by INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+    visibility_level_id INT NOT NULL REFERENCES VisibilityLevels(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE FamilyTrees (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -16,7 +40,8 @@ CREATE TABLE FamilyTrees (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE Nodes (
+
+CREATE TABLE Nodes_12323/*Created for each family tree (id 12323)*/ (
     id SERIAL PRIMARY KEY,
     family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
@@ -29,18 +54,19 @@ CREATE TABLE Nodes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE TreeMemberships (
+
+CREATE TABLE Admins_12323 /* Created for each family tree (id 12323) */ (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
     family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
-    role VARCHAR(50) DEFAULT 'member', -- "admin", "member", etc.
+    permissioned_node_id INT NOT NULL REFERENCES Nodes(id), -- Node from where user has permission
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE JoinRequests (
+
+CREATE TABLE MergeRequests (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
-    family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
-    node_id INT NOT NULL REFERENCES Nodes(id), -- Position where user wants to join
-    status VARCHAR(50) DEFAULT 'pending', -- "pending", "approved", "rejected"
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    original_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
+    target_tree_id INT NOT NULL REFERENCES ForkedFamilyTrees(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL, -- E.g., "pending", "accepted", "rejected"
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 );
