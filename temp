@@ -1,34 +1,29 @@
 CREATE TABLE Users (
     id SERIAL PRIMARY KEY,
-    email VARCHAR(255) UNIQUE,
-    password_hash VARCHAR(255),
-    name VARCHAR(100),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
     profile_photo_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-/* May merge the Users and the UserAuthProviders into a single table */
-
 CREATE TABLE UserAuthProviders (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
-    provider VARCHAR(50) NOT NULL, -- E.g., "google", "facebook", "apple"
-    provider_user_id VARCHAR(255) NOT NULL, -- The unique ID provided by the third-party auth
-    access_token TEXT, -- Optional, for API access (encrypted if stored)
-    refresh_token TEXT, -- Optional, for long-lived sessions (encrypted if stored)
+    provider VARCHAR(50) NOT NULL,
+    provider_user_id VARCHAR(255) NOT NULL,
+    access_token TEXT,
+    refresh_token TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (provider, provider_user_id) -- Prevent duplicate entries for the same provider
+    UNIQUE (provider, provider_user_id)
 );
 
-CREATE TABLE ForkedFamilyTrees (
+CREATE TABLE TreeVisibilityLevels (
     id SERIAL PRIMARY KEY,
-    original_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
-    forked_by INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
-    visibility_level_id INT NOT NULL REFERENCES VisibilityLevels(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    level_name VARCHAR(50) UNIQUE NOT NULL
 );
 
 CREATE TABLE FamilyTrees (
@@ -36,37 +31,68 @@ CREATE TABLE FamilyTrees (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     creator_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
-    visibility_level_id INT NOT NULL REFERENCES VisibilityLevels(id),
+    root_node_id INT NOT NULL,
+    visibility_level_id INT NOT NULL REFERENCES TreeVisibilityLevels(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_root_node FOREIGN KEY (root_node_id) REFERENCES Nodes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE ForkedFamilyTrees (
+    id SERIAL PRIMARY KEY,
+    original_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
+    forked_by INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE Nodes_12323/*Created for each family tree (id 12323)*/ (
+CREATE TABLE Nodes (
     id SERIAL PRIMARY KEY,
     family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     photo_url TEXT,
     description TEXT,
     alias VARCHAR(100),
-    is_user BOOLEAN DEFAULT FALSE, -- True if linked to a user account
-    user_id INT UNIQUE REFERENCES Users(id) ON DELETE SET NULL, -- Linked user account, if any
-    parent_node_id INT REFERENCES Nodes(id) ON DELETE SET NULL, -- For hierarchical relationships
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    user_id INT REFERENCES Users(id) ON DELETE
+    SET
+        NULL,
+        parent_node_id INT,
+        parent_relation VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_parent_node FOREIGN KEY (parent_node_id, family_tree_id) REFERENCES Nodes(id, family_tree_id) ON DELETE
+    SET
+        NULL
 );
 
-CREATE TABLE Admins_12323 /* Created for each family tree (id 12323) */ (
+CREATE INDEX idx_nodes_family_tree_id ON Nodes (family_tree_id);
+
+CREATE TABLE Admins (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
     family_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
-    permissioned_node_id INT NOT NULL REFERENCES Nodes(id), -- Node from where user has permission
+    permissioned_subtree_id INT NOT NULL REFERENCES Nodes(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_admins_family_tree_id ON Admins (family_tree_id);
+
+CREATE TABLE MergeRequestStatuses (
+    id SERIAL PRIMARY KEY,
+    status_name VARCHAR(50) UNIQUE NOT NULL
 );
 
 CREATE TABLE MergeRequests (
     id SERIAL PRIMARY KEY,
-    original_tree_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
-    target_tree_id INT NOT NULL REFERENCES ForkedFamilyTrees(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL, -- E.g., "pending", "accepted", "rejected"
+    fork_id INT NOT NULL REFERENCES FamilyTrees(id) ON DELETE CASCADE,
+    status_id INT NOT NULL REFERENCES MergeRequestStatuses(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE LoadNodeRequests (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+    node_id INT NOT NULL REFERENCES Nodes(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, node_id)
 );
